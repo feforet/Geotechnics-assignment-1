@@ -1,0 +1,12 @@
+"""
+LOADS
+"""
+
+
+"""
+FINITE DIFFERENCE METHOD
+"""
+
+
+"""
+"""
