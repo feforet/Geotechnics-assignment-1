@@ -3,26 +3,45 @@ from scipy.optimize import minimize
 import matplotlib.pyplot as plt
 
 # Constantes
-rho_air = 1.225  # Masse volumique de l'air en kg/m^3
+
 rho_water = 1030  # Masse volumique de l'eau en kg/m^3
-rotor_radius = 120  # Rayon du rotor en m (approximé pour une éolienne de 15MW)
-A_R = np.pi * (rotor_radius**2)  # Aire balayée par le rotor en m^2
-C_T = 0.5  # Coefficient de poussée du rotor
 C_D_tow = 0.4  # Coefficient de traînée de la tour
-U = 15  # Vitesse du vent en m/s
 H_m = 10  # Hauteur des vagues en m
 lambda_wave = 200  # Longueur d'onde en m
 T = 15  # Période des vagues en s
 omega = 2 * np.pi / T  # Fréquence angulaire des vagues en rad/s
-hw = 30  # Profondeur de l'eau en m
 D_tow = 6  # Diamètre approximé de la tour en m
 
-# Calcul de la force de poussée du rotor
-F_rotor = 0.5 * rho_air * A_R * C_T * U**2
-print("Force de poussée du rotor (N):", F_rotor)
 
-# Calcul de la force de traînée de la tour (par mètre de hauteur)
-F_tower_drag = 0.5 * rho_air * D_tow * C_D_tow * U**2
+# Vitesse vent 
+def wind_speed(z,hw):
+    return 5-0.05*(z+hw)
+
+##### Rotor thrust force calculation ####
+# Données
+rho_air = 1.204  # Masse volumique de l'air en kg/m^3
+rotor_radius = 120  # Rayon du rotor en m (approximé pour une éolienne de 15MW)
+A_R = np.pi * (rotor_radius**2)  # Aire balayée par le rotor en m^2
+hh= 150 # Hauteur de la tour en m
+hw = 30  # Profondeur de l'eau en m
+C_T = 0.5  # Coefficient de poussée du rotor
+# Calcul
+U = wind_speed(-(hh+hw),hw)  # Vitesse du vent en m/s
+F_rotor = 0.5 * rho_air * A_R * C_T * U**2
+print("Force de poussée du rotor :", F_rotor, "N")
+print("Force de poussée du rotor (kN):", F_rotor/1000, "kN")
+
+
+
+def Dtow(z):
+    return 10 - (3.5/150)*(z+30)
+
+
+#### Tower drag force calculation ####
+# Données
+C_D_tow = 0.4  # Coefficient de traînée de la tour
+# Calcul
+F_tower_drag = 0.5 * rho_air * Dtow(z) * C_D_tow * wind_speed(z)**2
 print("Force de traînée de la tour par mètre (N/m):", F_tower_drag)
 
 # Calcul de la force due aux vagues (force de Morison)
