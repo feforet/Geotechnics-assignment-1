@@ -1,74 +1,70 @@
 """
 Calcul de la capacité portante d'un pieu en utilisant la méthode des différences finies
 Par Félix Foret, Arnaud Guéguen et Louis Herphelin
-Toutes les valeurs sont en unités du système international (pas encore implémenté):
-- longueur: mètres
-- force: newtons
-- contrainte: pascals
-- moment: newton*mètres
-- moment d'inertie: mètres^4
-- module de Young: pascals
-- déplacement: mètres
-- angle: radians
-- raideur: newtons/mètre
-- poids spécifique: newtons/m^3
+Toutes les valeurs sont en unités du système international
 """
-
-import math
+import math as m
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 
+GLOBAL_COUNTER = 0
+
 """
-DATA
+DATA - OK
 """
 ### Soil properties
-# rate of increase with depth of initial modulus of subgrade reaction
-k = 22 * 10**6  # N/m^3
-# Submerged soil weight
-gamma_prime = 11 * 10**3  # N/m^3
-# friction angle
-phi_prime = math.radians(35)  # rad
+k = 22e6  # N/m^3
+gamma_prime = 11e3  # N/m^3
+phi_prime = m.radians(35)
 alpha = phi_prime / 2
-beta = math.radians(45) + phi_prime / 2
-# Coefficients of lateral earth pressure 
+beta = m.radians(45) + phi_prime / 2
 K0 = 0.4
-Ka = (1 - math.sin(phi_prime)) / (1 + math.sin(phi_prime))
+Ka = (1 - m.sin(phi_prime)) / (1 + m.sin(phi_prime))
+C1 = ((m.tan(beta)**2 * m.tan(alpha)) / m.tan(beta - phi_prime)) + K0 * ((m.tan(phi_prime) * m.sin(beta) / (m.cos(alpha) * m.tan(beta - phi_prime))) + (m.tan(beta) * (m.tan(phi_prime) * m.sin(beta) - m.tan(alpha))))
+C2 = m.tan(beta) / m.tan(beta - phi_prime) - Ka
+C3 = Ka * ((m.tan(beta)**8 - 1) + K0 * m.tan(phi_prime) * (m.tan(beta)**4))
 
-# Pile properties
-E = 210 * 10**9  # Pa
+### Pile properties
+E = 210e9
 t = lambda D: min (0.00635 + D/100, 0.09)
-I = lambda D: math.pi * (D**4 - (D - 2 * t(D))**4) / 64
-volume = lambda D, L: L * math.pi * ((D**2 / 4) - ((D - 2 * t(D))**2 / 4))
+I = lambda D: m.pi * (D**4 - (D - 2 * t(D))**4) / 64  # a verifier
+volume = lambda DL: DL[0] * m.pi * ((DL[1]**2 / 4) - ((DL[1] - 2 * t(DL[1]))**2 / 4))
+sigma_max = lambda D: M * (D / 2) / I(D)  # prendre en compte l'effort tranchant ?
+f_y = 355e6
 
-# Calculation parameters
+### Calculation parameters
+# TODO: A ajuster
 n_nodes = 10
 tolerance = 1e-6
 max_iter = 1000
+facteur_reduc_y_init = 1e-3
 
-# Optimization parameters
-# ...
+### Optimization parameters
+# TODO: A ajuster
+DL0 = [10, 100]
+DL_history = [np.copy(DL0)]
+y_history = []
 
 """
-LOADS
+LOADS - OK
 """
+# TODO: A ajuster (même écrire leur formule si besoin genre pour pas arrondir)
 M = 0  # Nm
 H = 0  # N
 
 """
-API p-y curve
+p-y curve - OK
 """
-def k_yD (z, y, D):
-    C1 = ...
-    C2 = ...
-    C3 = ...
-    A = lambda z: max(3 - 0.8*z/D, 0.9)
-    p_u = lambda z: min((C1*z + C2*D) * gamma_prime * z, C3 * D * gamma_prime * z)
-    p = lambda y, z: A(z) * p_u(z) * np.tanh(k * z * y / (A(z) * p_u(z)))
-    return p(y, z) / y
+def k_yD (y, z, D):
+    if y == 0: y = 1e-6
+    A = max(3 - 0.8*z/D, 0.9)
+    p_u = min((C1*z + C2*D), C3 * D) * gamma_prime * z
+    p = A * p_u * np.tanh(k * z * y / (A * p_u))
+    return p / y
 
 """
-FINITE DIFFERENCE METHOD
+FINITE DIFFERENCE METHOD - TODO
 """
 # E * I * (d^4 y(z) / dz^4) + k_y * D * y(z) = 0
 
@@ -79,15 +75,17 @@ FINITE DIFFERENCE METHOD
 
 # f^(4) (x) = (f(x-2h) - 4f(x-h) + 6f(x) - 4f(x+h) + f(x+2h)) / (h^4)
 
-def solve(L, D):
+def solve(DL):
+    D, L = DL
     h = L / (n_nodes - 1)
     I_D = I(D)
+    return tuple([D*L]*n_nodes)  # TODO enlever cette ligne
 
-    # coordonnées des noeuds
     z = np.linspace(0, L, n_nodes)
-    y = np.random.rand(n_nodes) / 1000
+    y = (np.random.rand(n_nodes) - 0.5) / facteur_reduc_y_init
     b = np.zeros(n_nodes)
     K = np.zeros((n_nodes, n_nodes))
+
     Kii2 = E * I_D / h**4
     Kii1 = -4 * Kii2
     Kii = 6 * Kii2
@@ -96,54 +94,110 @@ def solve(L, D):
         K[i, i-1] = Kii1
         K[i, i+1] = Kii1
         K[i, i+2] = Kii2
+    
+    ### START - TODO
+    ### Le faire dans la bonne rangée de la matrice K
+    ### Ajouter M et H dans b
+    #EI * (2y(0) - 5y(h) + 4y(2h) - y(3h)) / h^2 = M(0)
+    K[0, 0] = 2 * E * I_D / h**2
+    K[0, 1] = -5 * E * I_D / h**2
+    K[0, 2] = 4 * E * I_D / h**2
+    K[0, 3] = -E * I_D / h**2
+    #EI * (2y(L) - 5y(L-h) + 4y(L-2h) - y(L-3h)) / h^2 = 0
+    K[n_nodes-1, n_nodes-1] = 2 * E * I_D / h**2
+    K[n_nodes-1, n_nodes-2] = -5 * E * I_D / h**2
+    K[n_nodes-1, n_nodes-3] = 4 * E * I_D / h**2
+    K[n_nodes-1, n_nodes-4] = -E * I_D / h**2
+    #EI * (-y(0) + 3y(h) - 3y(2h) + y(3h)) / h^3 = V(0)
+    K[0, 0] += -E * I_D / h**3
+    K[0, 1] += 3 * E * I_D / h**3
+    K[0, 2] += -3 * E * I_D / h**3
+    K[0, 3] += E * I_D / h**3
+    #EI * (y(L) - 3y(L-h) + 3y(L-2h) - y(L-3h)) / h^3 = 0
+    K[n_nodes-1, n_nodes-1] += E * I_D / h**3
+    K[n_nodes-1, n_nodes-2] += -3 * E * I_D / h**3
+    K[n_nodes-1, n_nodes-3] += 3 * E * I_D / h**3
+    K[n_nodes-1, n_nodes-4] += -E * I_D / h**3
+    ### END - TODO
 
     iter = 0
-    while iter < max_iter:
-        iter += 1
+    while True:
         for i in range(2, n_nodes - 2):
-            K[i, i] = Kii + k_yD(z[i], y[i], D)
+            K[i, i] = Kii + k_yD(y[i], z[i], D)
 
-        ### START - A modifier
-        ### A placer avant la boucle while parce que les valeurs ne changent pas
-        ### Le faire dans la bonne rangée de la matrice K
-        #EI * (2y(0) - 5y(h) + 4y(2h) - y(3h)) / h^2 = M(0)
-        K[0, 0] = 2 * E * I_D / h**2
-        K[0, 1] = -5 * E * I_D / h**2
-        K[0, 2] = 4 * E * I_D / h**2
-        K[0, 3] = -E * I_D / h**2
-        #EI * (2y(L) - 5y(L-h) + 4y(L-2h) - y(L-3h)) / h^2 = 0
-        K[n_nodes-1, n_nodes-1] = 2 * E * I_D / h**2
-        K[n_nodes-1, n_nodes-2] = -5 * E * I_D / h**2
-        K[n_nodes-1, n_nodes-3] = 4 * E * I_D / h**2
-        K[n_nodes-1, n_nodes-4] = -E * I_D / h**2
-        #EI * (-y(0) + 3y(h) - 3y(2h) + y(3h)) / h^3 = V(0)
-        K[0, 0] += -E * I_D / h**3
-        K[0, 1] += 3 * E * I_D / h**3
-        K[0, 2] += -3 * E * I_D / h**3
-        K[0, 3] += E * I_D / h**3
-        #EI * (y(L) - 3y(L-h) + 3y(L-2h) - y(L-3h)) / h^3 = 0
-        K[n_nodes-1, n_nodes-1] += E * I_D / h**3
-        K[n_nodes-1, n_nodes-2] += -3 * E * I_D / h**3
-        K[n_nodes-1, n_nodes-3] += 3 * E * I_D / h**3
-        K[n_nodes-1, n_nodes-4] += -E * I_D / h**3
-        ### END - A modifier
+        old_y = y
+        y = np.linalg.solve(K, b)
 
-        new_y = np.linalg.solve(K, b)
-        if (np.linalg.norm(new_y - y) < tolerance):
+        if (np.linalg.norm(y - old_y) < tolerance):
             break
-        y = new_y
+        if (iter > max_iter):
+            print("Maximum number of iterations reached")
+            exit()
+
+        iter += 1
+
     return y
 
+"""
+OPTIMIZATION - OK
+"""
+### utiliser scipy.optimize pour minimiser volume(D, L) sous contrainte de déplacement maximal et de contrainte maximale
+def launch_optimization():
+    constr = [{'type': 'ineq', 'fun': lambda x: f_y - sigma_max(x[0])}, {'type': 'ineq', 'fun': lambda x: 0.1*x[0] - solve(x)[0]}, {'type': 'ineq', 'fun': lambda x: min(x)}]
+    res = sp.optimize.minimize(volume, DL0, constraints=constr, callback=lambda x: DL_history.append(np.copy(x)))
+    return res
 
 """
-OPTIMIZATION
-"""
-### utiliser scipy.optimize pour minimiser volume(D, L) sous contrainte de déplacement maximal
-
-"""
-PLOTTING
+PLOTTING - OK
 """
 ### plotter le déplacement y(z) en fonction de z
-### plotter la contrainte sigma(z) en fonction de z
-### plotter le volume d'acier en fonction de D et L
-### plotter le déplacement maximal en fonction de D et L
+def plot_displacement(y, z):
+    plt.plot(y, -z)
+    plt.xlabel('z (m)')
+    plt.ylabel('y (m)')
+    plt.title('Déplacement du pieu')
+    plt.show()
+
+### TODO plotter la contrainte sigma(z) en fonction de z
+# Pour ca il faudrait une fonction qui dit le moment en fonction de z
+
+### TODO plotter le moment en fonction de z
+# Pour ca il faudrait une fonction qui dit le moment en fonction de z
+
+### TODO plotter l'effort tranchant en fonction de z
+# Pour ca il faudrait une fonction qui dit l'effort tranchant en fonction de z
+
+### plotter le volume d'acier en fonction de D
+def plot_volume_D(DL_history, vol_hist):
+    DL_hist = np.array(DL_history)
+    D_hist = DL_hist[:, 0]
+    plt.plot(D_hist, vol_hist)
+    plt.xlabel('D (m)')
+    plt.ylabel('Volume (m^3)')
+    plt.title('Volume d\'acier en fonction de D')
+    plt.show()
+
+### plotter le volume d'acier en fonction de L
+def plot_volume_L(DL_history, vol_hist):
+    DL_hist = np.array(DL_history)
+    L_hist = DL_hist[:, 1]
+    plt.plot(L_hist, vol_hist)
+    plt.xlabel('L (m)')
+    plt.ylabel('Volume (m^3)')
+    plt.title('Volume d\'acier en fonction de L')
+    plt.show()
+
+"""
+START PROGRAM
+"""
+result = launch_optimization()
+D_opt, L_opt = result.x
+print(D_opt, L_opt)
+y = solve((D_opt, L_opt))
+plot_displacement(y, np.linspace(0, L_opt, n_nodes))
+# Peut-etre rajouter D_opt et L_opt dans DL_history (a verifier, mais a priori non)
+#DL_history.append([D_opt, L_opt])
+vol_hist = np.array([volume(DL) for DL in DL_history])
+plot_volume_D(DL_history, vol_hist)
+plot_volume_L(DL_history, vol_hist)
+for DL in DL_history: y_history.append(solve(DL))
