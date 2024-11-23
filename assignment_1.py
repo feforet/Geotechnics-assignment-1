@@ -1,7 +1,7 @@
 """
-Calcul de la capacité portante d'un pieu en utilisant la méthode des différences finies
-Par Félix Foret, Arnaud Guéguen et Louis Herphelin
-Toutes les valeurs sont en unités du système international
+Calcul de la capacite portante d'un pieu en utilisant la methode des differences finies
+Par Felix Foret, Arnaud Gueguen et Louis Herphelin
+Toutes les valeurs sont en unites du systeme international
 """
 import math as m
 import numpy as np
@@ -9,32 +9,33 @@ import scipy as sp
 import matplotlib.pyplot as plt
 
 """
-Données
+Donnees
 """
-### Dimensions représentées dans l'enonce
+### Dimensions representees dans l'enonce
 h_w = 30  # Profondeur de l'eau
 D_h = 6.5  # Diametre de la tour au sommet
 D_b = 10  # Diametre de la tour a la base
 h_h = 150  # Hauteur de la tour
 R = 120  # Longueur des pales
-D_tower = lambda z: D_b + (D_b - D_h) * (z + h_w) / h_h  # Diamètre de la tour en tout point z
+# Diametre de la tour en tout point z
+D_tower = lambda z: D_b + (D_b - D_h) * (z + h_w) / h_h
 
-### Proptiétés du vent
+### Proptietes du vent
 rho_air = 1.204  # Masse volumique de l'air
 C_T = 0.5
 C_D = 0.4
 
-### Propriétés des vagues
+### Proprietes des vagues
 H_m = 10  # Hauteur significative des vagues
 lmbd = 200  # Longueur d'onde
 k_w = 2 * m.pi / lmbd  # Nombre d'onde
-T = 15  # Période des vagues
+T = 15  # Periode des vagues
 omega = 2 * m.pi / T  # Pulsation des vagues
 rho_w = 1030  # Masse volumique de l'eau
 C_m = 2
 A = lambda D: m.pi * (D**2 / 4)  # Section pleine du pieu
 
-### Propriétés du sol
+### Proprietes du sol
 k = 22e6
 gamma_prime = 11e3  # Poids volumique du sol
 phi_prime = m.radians(35)  # Angle de frottement interne
@@ -42,28 +43,28 @@ alpha = phi_prime / 2
 beta = m.radians(45) + phi_prime / 2
 K0 = 0.4  # Coefficient de pression au repos
 Ka = (1 - m.sin(phi_prime)) / (1 + m.sin(phi_prime))  # Coefficient de pression active
-C1 = ((m.tan(beta)**2 * m.tan(alpha)) / m.tan(beta - phi_prime)) + K0 * ((m.tan(phi_prime) * m.sin(beta) / (m.cos(alpha) * m.tan(beta - phi_prime))) + (m.tan(beta) * (m.tan(phi_prime) * m.sin(beta) - m.tan(alpha))))
+C1 = (((m.tan(beta)**2 * m.tan(alpha)) / m.tan(beta - phi_prime))
+      + K0 * ((m.tan(phi_prime) * m.sin(beta) / (m.cos(alpha) * m.tan(beta - phi_prime)))
+              + (m.tan(beta) * (m.tan(phi_prime) * m.sin(beta) - m.tan(alpha)))))
 C2 = m.tan(beta) / m.tan(beta - phi_prime) - Ka
 C3 = Ka * ((m.tan(beta)**8 - 1) + K0 * m.tan(phi_prime) * (m.tan(beta)**4))
 
-### Propriétés du pieu
+### Proprietes du pieu
 E = 210e9  # Module de Young de l'acier
 t = lambda D: min (0.00635 + D/100, 0.09)  # Epaisseur de la paroi du pieu
 I = lambda D: m.pi * (D**4 - (D - 2 * t(D))**4) / 64  # Moment d'inertie du pieu
 section = lambda D: m.pi * (D**2 - (D - 2 * t(D))**2) / 4  # Section d'acier du pieu
 volume = lambda DL: DL[1] * m.pi * section(DL[0])  # Volume d'acier du pieu
-sigma_max_bending = lambda D: M(D) * (D / 2) / I(D)  # Contrainte de flexion maximale en z=0
-sigma_max_shear = lambda D: H(D) / section(D)  # Contrainte de cisaillement maximale en z=0
-sigma_max = lambda D: (sigma_max_bending(D) / 2) + m.sqrt((sigma_max_bending(D) / 2)**2 + sigma_max_shear(D)**2)  # Contrainte maximale en z=0
-f_y = 355e6  # Limite d'élasticité de l'acier
+length = lambda volume, D: volume / (m.pi * section(D))  # Longueur du pieu en fonction de son volume
+f_y = 355e6  # Limite d'elasticite de l'acier
 
-### Paramètres de calcul
-n_nodes = 10**3  # Nombre de noeuds
-tolerance = 1e-4  # Tolérance de convergence
-max_iter = 1e3  # Nombre maximal d'itérations
+### Parametres de calcul
+n_nodes = 200  # Nombre de noeuds
+tolerance = 1e-5  # Tolerance de convergence
+max_iter = 1e4  # Nombre maximal d'iterations
 
-### Paramètres d'optimisation
-DL0 = [6, 35]  # Valeurs initiales de D et L
+### Parametres d'optimisation
+DL0 = [5.76, 20.08]  # Valeurs initiales de D et L
 
 """
 Charges
@@ -73,13 +74,13 @@ U = lambda z: 5 - 0.05 * (z + h_w)
 A_r = m.pi * R**2
 F_rot = rho_air * A_r * C_T * (U(-h_h-h_w)**2) / 2
 bras_lev_rot = (h_h + h_w)
-print(f"F_rot = {F_rot:.2f} N \t\tL_rot = {bras_lev_rot:.2f} m \tM_rot = {F_rot*bras_lev_rot:.2f} Nm")  # Pour vérifier
+print(f"F_rot = {F_rot:.2f} N \t\tL_rot = {bras_lev_rot:.2f} m \tM_rot = {F_rot*bras_lev_rot:.2f} Nm")
 
 # Force sur la tour
 dF_tower = lambda z: rho_air * D_tower(z) * C_D * (U(z)**2) / 2
 F_tow = sp.integrate.quad(dF_tower, -h_h-h_w, -h_w)[0]
 M_tow = - sp.integrate.quad(lambda z: z * dF_tower(z), -h_h-h_w, -h_w)[0]
-print(f"F_tow = {F_tow:.2f} N \t\tL_tow = {M_tow/F_tow:.2f} m \tM_tow = {M_tow:.2f} Nm")  # Pour vérifier
+print(f"F_tow = {F_tow:.2f} N \t\tL_tow = {M_tow/F_tow:.2f} m \tM_tow = {M_tow:.2f} Nm")
 
 # Force sur le pieu
 cos = lambda: 1
@@ -89,41 +90,40 @@ w_prime = lambda z: -(H_m / 2) * (omega**2) * m.cosh(-k_w*z) / m.sinh(k_w*h_w) *
 dF_w = lambda z, D: (rho_w * D * C_D * w(z) * abs(w(z)) / 2) + (C_m * rho_w * A(D) * w_prime(z))
 F_w = lambda D: sp.integrate.quad(dF_w, -h_w, 0, args=(D))[0]
 M_w = lambda D: - sp.integrate.quad(lambda z: z * dF_w(z, D), -h_w, 0)[0]
-print(f"F_w(D={DL0[0]}m) = {F_w(DL0[0]):.2f} N \tL_w(D={DL0[0]}m) = {M_w(DL0[0])/F_w(DL0[0]):.2f} m \tM_w(D={DL0[0]}m) = {M_w(DL0[0]):.2f} Nm")  # Pour vérifier
+print(f"F_w(D={DL0[0]}m) = {F_w(DL0[0]):.2f} N \tL_w(D={DL0[0]}m) = {M_w(DL0[0])/F_w(DL0[0]):.2f} m \tM_w(D={DL0[0]}m) = {M_w(DL0[0]):.2f} Nm")
 
 # Forces totales
-H_ = lambda D: 1.35 * (F_rot + F_tow + F_w(D))
-M_ = lambda D: 1.35 * ((F_rot * bras_lev_rot) + M_tow + M_w(D))
-H = lambda D: 2903138.044 + 41814.63*D + 60994.1552*(D**2)  # Effort horizontal en tete du pieu
-M = lambda D: 520732074.4 + (528678*D + 723490*(D**2)) * 1.35  # Moment en tete du pieu
+H = lambda D: 1.35 * (F_rot + F_tow + F_w(D))  # Effort horizontal en tete du pieu
+M = lambda D: 1.35 * ((F_rot * bras_lev_rot) + M_tow + M_w(D))  # Moment en tete du pieu
+H_ = lambda D: 2903138.044 + 41814.63*D + 60994.1552*(D**2)
+M_ = lambda D: 520732074.4 + (528678*D + 723490*(D**2)) * 1.35
 print(f"H(D={DL0[0]}m) = {H(DL0[0]):.2f} N \tM(D={DL0[0]}m) = {M(DL0[0]):.2f} Nm")
 
 """
 Courbe p-y
 """
-def k_yD (y, z, D):
-    if y == 0: y = 1e-6  # Pour éviter les divisions par 0
+def k_y(y, z, D):
+    if y == 0: y = 1e-6  # Pour eviter les divisions par 0
     A = max(3 - 0.8*z/D, 0.9)
     p_u = min((C1*z + C2*D), C3 * D) * gamma_prime * z
     p = A * p_u * np.tanh(k * z * y / (A * p_u))
-    return p / y
+    return p / (y * D)
 
 """
 Methode des differences finies
 """
-def solve(DL, verbose=True):
-    if verbose: print(f"Solving for D={DL[0]} and L={DL[1]}")
+def solve(DL):
     D, L = DL
-    if (D <= 0 or L <= 0): return np.full(n_nodes, np.inf)  # Si D ou L sont négatifs ou nuls, on retourne un vecteur infini
-    dz = L / (n_nodes - 1)  # Pas de discrétisation
+    if (D <= 0 or L <= 0): return np.full(n_nodes, np.inf)  # Valeurs invalides
+    dz = L / (n_nodes - 1)  # Pas de discretisation
     I_D = I(D)  # Moment d'inertie du pieu
 
     z = np.linspace(0, L, n_nodes)  # Vecteur des hauteurs
-    y = np.ones(n_nodes) / 10  # Vecteur des déplacements
+    y = np.ones(n_nodes) / 10  # Vecteur des deplacements
     b = np.zeros(n_nodes)  # Vecteur des forces
-    K = np.zeros((n_nodes, n_nodes))  # Matrice de rigidité
+    K = np.zeros((n_nodes, n_nodes))  # Matrice de rigidite
 
-    # Remplissage de la matrice de rigidité
+    # Remplissage de la matrice de rigidite
     Kii2 = E * I_D / dz**4
     Kii1 = -4 * Kii2
     Kii = 6 * Kii2
@@ -161,9 +161,8 @@ def solve(DL, verbose=True):
 
     iter = 0
     while True:
-        if verbose: print(iter)
         for i in range(2, n_nodes - 2):
-            K[i, i] = Kii + k_yD(y[i], z[i], D)  # Maj des termes dependants de y
+            K[i, i] = Kii + D * k_y(y[i], z[i], D)  # Maj des termes dependants de y
 
         old_y = y
         y = np.linalg.solve(K, b)
@@ -171,10 +170,15 @@ def solve(DL, verbose=True):
         if (np.linalg.norm(y - old_y) < tolerance):
             break  # Convergence atteinte
         if (np.linalg.norm(y) > D): 
-            break  # Déplacement largement supérieur à la limite
+            break  # Deplacement largement superieur a la limite
         if (iter > max_iter):
             y = np.full(n_nodes, np.inf)
-            break  # Nombre maximal d'itérations atteint
+            print(f"Max iterations reached: {D}, {L}")
+            break  # Nombre maximal d'iterations atteint
+        # Pour eviter les problemes de convergence
+        if (iter!=0 and iter % (max_iter//10) == 0):
+            print(f"Iteration {iter} reached for D={D}, L={L}")
+            y += np.random.rand(n_nodes) * 1e-3
         iter += 1
 
     return y
@@ -182,70 +186,117 @@ def solve(DL, verbose=True):
 """
 Optimisation
 """
-def launch_optimization():  # Problèmes de convergence
-    constr = [{'type': 'ineq', 'fun': lambda x: f_y - sigma_max(x[0])},  # Contrainte max
-              {'type': 'ineq', 'fun': lambda x: 0.1*x[0] - abs(solve(x)[0])}]  # Déplacement en tete max
-    bounds = [(4, None), (10, None)]
-    res = sp.optimize.minimize(volume, DL0, constraints=constr, bounds=bounds)
-    print(res)
-    return res.x
-def my_optimization(dmin=0, dmax=30, ds=31, lmin=0, lmax=100, ls=101):
-    DL_y_sigma_V_Accept = [{'DL': (d, l), 'V': 0, 'Acceptable': False}for l in np.linspace(lmin, lmax, ls) for d in np.linspace(dmin, dmax, ds)]
-    for dict in DL_y_sigma_V_Accept:
-        D, L = dict['DL']
-        dict['V'] = volume((D,L))  # Volume d'acier
-        y_tete = solve((D,L), verbose=False)[0]  # Deplacement en tete
-        sigma = sigma_max(D)  # Contrainte max
-        dict['Acceptable'] = f_y - sigma > 0 and 0.1*D - abs(y_tete) > 0
-    # Suppression des combinaisons non acceptables
-    filtered_dict = np.array([dict for dict in DL_y_sigma_V_Accept if dict['Acceptable']])
-    # Tri par ordre croissant de volume
-    sorted_dict = sorted(filtered_dict, key=lambda x: x['V'])
+def launch_optimization():
+    starting_d = 4
+    best_volume = volume((DL0[0], DL0[1]))
+    best_d = DL0[0]
+    best_l = DL0[1]
+    for i in range((20-4)*100 + 1):
+        d = starting_d + i/100
+        l_max = length(best_volume, d) * 1.1
+        l = optimal_l(d, l_max)
+        if (l is None): continue
+        vol = volume((d, l))
+        if vol < best_volume:
+            best_volume = vol
+            best_d = d
+            best_l = l
+            
+    DL_opt = (best_d, best_l)
+    return DL_opt
 
-    return sorted_dict
+def optimal_l(d, l_max):
+    l = l_max
+    incr = 1
+    while incr > 1e-5:
+        y = solve((d, l))
+        ms, vs, sigmas = M_V_sigma(y, np.linspace(0, l, n_nodes), d)
+        if (y[0] > 0.1*d) or (max(sigmas) > f_y):
+            l += incr
+            incr /= 10
+        l -= incr
+        if l > l_max: return None
+    return l
 
 """
 Plots
 """
-### plotter le déplacement y(z) en fonction de z
-def plot_displacement(y, z):
-    plt.plot(y, -z)
-    plt.xlabel('Déplacement latéral [m]')
+### calcul des mmoments et efforts tranchants
+def M_V_sigma(y, z, D):
+    dydz = np.gradient(y, z, edge_order=2)
+    d2ydz2 = np.gradient(dydz, z, edge_order=2)
+    Ms = E * I(D) * d2ydz2
+    Ms[0] = M(D)  # Moment en tete
+    Ms[-1] = 0  # Moment en pied
+    Vs = np.gradient(Ms, z, edge_order=2)
+    Vs[0] = H(D)  # Effort en tete
+    Vs[-1] = 0  # Effort en pied
+    sigmas_bending = Ms * (D / 2) / I(D)
+    sigmas_shear = Vs / section(D)
+    sigmas = sigmas_bending/2 + np.sqrt((sigmas_bending/2)**2 + sigmas_shear**2)
+    return Ms, Vs, sigmas
+
+### plotter le deplacement y(z) en fonction de z
+def plot_displacement(ys, z):
+    plt.plot(ys/1e2, -z)
+    plt.xlabel('Deplacement lateral [cm]')
     plt.ylabel('Profondeur (-z) [m]')
-    plt.title('Déplacement du pieu')
+    plt.title('Deplacement du pieu')
     plt.show()
 
 ### TODO plotter la contrainte sigma(z) en fonction de z
-# Pour ca il faudrait une fonction qui dit le moment en fonction de z
+def plot_stresses(sigmas, z):
+    plt.plot(sigmas/1e6, -z)
+    plt.xlabel('Contrainte [MPa]')
+    plt.ylabel('Profondeur (-z) [m]')
+    plt.title('Contrainte du pieu')
+    plt.show()
 
 ### TODO plotter le moment en fonction de z
-# Pour ca il faudrait une fonction qui dit le moment en fonction de z
+def plot_moments(Ms, z):
+    plt.plot(Ms/1e6, -z)
+    plt.xlabel('Moment [MNm]')
+    plt.ylabel('Profondeur (-z) [m]')
+    plt.title('Moment flechissant du pieu')
+    plt.show()
 
 ### TODO plotter l'effort tranchant en fonction de z
-# Pour ca il faudrait une fonction qui dit l'effort tranchant en fonction de z
+def plot_shear_forces(Vs, z):
+    plt.plot(Vs/1e6, -z)
+    plt.xlabel('Effort tranchant [MN]')
+    plt.ylabel('Profondeur (-z) [m]')
+    plt.title('Effort tranchant du pieu')
+    plt.show()
 
 """
-Démarrage du programme
+Demarrage du programme
 """
 y = solve(DL0)
+y_tete = y[0]
+z = np.linspace(0, DL0[1], n_nodes)
+Ms, Vs, sigmas = M_V_sigma(y, z, DL0[0])
+sigma_max = max(sigmas)
+z_sigma_max = z[np.argmax(sigmas)]
 print(f"Volume(D={DL0[0]}m, L={DL0[1]}m) = {volume(DL0):.2f} m^3")
-print(f"sigma_max(D={DL0[0]}m) = {sigma_max(DL0[0]):.2f} N/m^2")
-print(f"deplacement en tete = {y[0]:.6f} m")
-plot_displacement(y, np.linspace(0, DL0[1], n_nodes))
+print(f"sigma_max(D={DL0[0]}m, z={z_sigma_max:.4f}m) = {sigma_max:.2f} N/m^2")
+print(f"deplacement en tete = {y_tete:.6f} m")
 
+DL_opt = launch_optimization()
+D_opt, L_opt = DL_opt
+y_opt = solve((D_opt, L_opt))
+y_tete_opt = y[0]
+z_opt = np.linspace(0, L_opt, n_nodes)
+Ms_opt, Vs_opt, sigmas_opt = M_V_sigma(y_opt, z_opt, D_opt)
+sigma_max_opt = max(sigmas_opt)
+z_sigma_max_opt = z_opt[np.argmax(sigmas_opt)]
 
-dmin, dmax, ds = 3, 10, 8
-lmin, lmax, ls = 10, 30, 21
-DL_y_sigma_V_Accept = my_optimization(dmin=dmin, dmax=dmax, ds=ds, lmin=lmin, lmax=lmax, ls=ls)
-D_opt, L_opt = DL_y_sigma_V_Accept[0]['DL']
 print("-"*80 + "\nOptimization result:")
-print(f"D_min={dmin}m, D_max={dmax}m, D_step={ds}")
-print(f"L_min={lmin}m, L_max={lmax}m, L_step={ls}")
-print(f"D = {D_opt:.2f} m \tL = {L_opt:.2f} m")
-print(f"Volume(D={D_opt:.2f}m, L={L_opt:.2f}m) = {volume((D_opt, L_opt)):.2f} m^3")
-print(f"sigma_max(D={D_opt}) = {sigma_max(D_opt):.2f} N/m^2")
-y = solve((D_opt, L_opt), verbose=False)
-print(f"Deplacement en tete = {y[0]:.6f} m")
-print(f"y[0] = {y[0]/D_opt:.6f} * D")
+print(f"D = {D_opt:.4f} m \tL = {L_opt:.4f} m")
+print(f"Volume(D={D_opt:.4f}m, L={L_opt:.4f}m) = {volume((D_opt, L_opt)):.4f} m^3")
+print(f"sigma_max(D={D_opt:.4f}m, z={z_sigma_max_opt:.4f}m) = {sigma_max_opt:.4f} N/m^2")
+print(f"Deplacement en tete = {y_tete_opt:.6f} m")
+print(f"y[0] = {y_tete_opt/D_opt:.6f} * D")
 plot_displacement(y, np.linspace(0, L_opt, n_nodes))
-plt.show()
+plot_moments(Ms_opt, z_opt)
+plot_shear_forces(Vs_opt, z_opt)
+plot_stresses(sigmas_opt, z_opt)
