@@ -55,7 +55,7 @@ t = lambda D: min (0.00635 + D/100, 0.09)  # Epaisseur de la paroi du pieu
 I = lambda D: m.pi * (D**4 - (D - 2 * t(D))**4) / 64  # Moment d'inertie du pieu
 section = lambda D: m.pi * (D**2 - (D - 2 * t(D))**2) / 4  # Section d'acier du pieu
 volume = lambda DL: DL[1] * m.pi * section(DL[0])  # Volume d'acier du pieu
-length = lambda volume, D: volume / (m.pi * section(D))  # Longueur du pieu en fonction de son volume
+length = lambda volume, D: volume / (m.pi * section(D))
 f_y = 355e6  # Limite d'elasticite de l'acier
 
 ### Parametres de calcul
@@ -96,7 +96,7 @@ print(f"F_w(D={DL0[0]}m) = {F_w(DL0[0]):.2f} N \tL_w(D={DL0[0]}m) = {M_w(DL0[0])
 H = lambda D: 1.35 * (F_rot + F_tow + F_w(D))  # Effort horizontal en tete du pieu
 M = lambda D: 1.35 * ((F_rot * bras_lev_rot) + M_tow + M_w(D))  # Moment en tete du pieu
 H_ = lambda D: 2903138.044 + 41814.63*D + 60994.1552*(D**2)
-M_ = lambda D: 520732074.4 + (528678*D + 723490*(D**2)) * 1.35
+M_ = lambda D: 520732074.4 + 713715.3*D + 977116.5*(D**2)
 print(f"H(D={DL0[0]}m) = {H(DL0[0]):.2f} N \tM(D={DL0[0]}m) = {M(DL0[0]):.2f} Nm")
 
 """
@@ -169,8 +169,8 @@ def solve(DL):
 
         if (np.linalg.norm(y - old_y) < tolerance):
             break  # Convergence atteinte
-        if (np.linalg.norm(y) > D): 
-            break  # Deplacement largement superieur a la limite
+        if (np.linalg.norm(y) > 10*D):
+            break
         if (iter > max_iter):
             y = np.full(n_nodes, np.inf)
             print(f"Max iterations reached: {D}, {L}")
@@ -184,7 +184,7 @@ def solve(DL):
     return y
 
 """
-Optimisation
+Optimisation des dimensions
 """
 def launch_optimization():
     starting_d = 4
@@ -238,7 +238,7 @@ def M_V_sigma(y, z, D):
 
 ### plotter le deplacement y(z) en fonction de z
 def plot_displacement(ys, z):
-    plt.plot(ys/1e2, -z)
+    plt.plot(ys*1e2, -z)
     plt.xlabel('Deplacement lateral [cm]')
     plt.ylabel('Profondeur (-z) [m]')
     plt.title('Deplacement du pieu')
@@ -280,6 +280,11 @@ z_sigma_max = z[np.argmax(sigmas)]
 print(f"Volume(D={DL0[0]}m, L={DL0[1]}m) = {volume(DL0):.2f} m^3")
 print(f"sigma_max(D={DL0[0]}m, z={z_sigma_max:.4f}m) = {sigma_max:.2f} N/m^2")
 print(f"deplacement en tete = {y_tete:.6f} m")
+plot_displacement(y, z)
+plot_moments(Ms, z)
+plot_shear_forces(Vs, z)
+plot_stresses(sigmas, z)
+
 
 DL_opt = launch_optimization()
 D_opt, L_opt = DL_opt
