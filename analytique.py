@@ -17,8 +17,8 @@ z = np.linspace( 0, prof, 1000)
 y = np.exp(-z*lambdaa)*((-V0/(2*(lambdaa**3)*Eb*I) - M0/(2*(lambdaa**2)*Eb*I)) * np.cos(lambdaa*z) + (M0/(2*(lambdaa**2)*Eb*I)) * np.sin(lambdaa*z))
 
 # Plot
-plt.plot(-y, -z)
-plt.xlabel('Déplacement latéral (m)')
+plt.plot(-y*100, -z)
+plt.xlabel('Déplacement latéral (cm) ')
 plt.ylabel('Profondeur (m)')
 plt.title('Déplacement latéral du pieu en fonction de la profondeur')
 plt.show()
