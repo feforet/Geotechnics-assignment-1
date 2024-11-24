@@ -123,7 +123,7 @@ def solve(DL):
     b = np.zeros(n_nodes)  # Vecteur des forces
     K = np.zeros((n_nodes, n_nodes))  # Matrice de rigidite
 
-    # Remplissage de la matrice de rigidite
+    # Remplissage de la matrice de rigidite avec les elements ne dependant pas de y
     Kii2 = E * I_D / dz**4
     Kii1 = -4 * Kii2
     Kii = 6 * Kii2
@@ -140,7 +140,7 @@ def solve(DL):
     K[0, 2] = 4 * E * I_D / dz**2
     K[0, 3] = -E * I_D / dz**2
     b[0] = M(D)
-    #EI * (-y(0) + 3y(h) - 3y(2h) + y(3h)) / h^3 = V(0)
+    #EI * (-5y(0) + 18y(h) - 24y(2h) + 14y(3h) - 3y(4h)) / (2h^3) = V(0)
     K[1, 0] = -5 * E * I_D / (2 * dz**3)
     K[1, 1] = 18 * E * I_D / (2 * dz**3)
     K[1, 2] = -24 * E * I_D / (2 * dz**3)
@@ -152,7 +152,7 @@ def solve(DL):
     K[n_nodes-1, n_nodes-2] = -5 * E * I_D / dz**2
     K[n_nodes-1, n_nodes-3] = 4 * E * I_D / dz**2
     K[n_nodes-1, n_nodes-4] = -E * I_D / dz**2
-    #EI * (y(L) - 3y(L-h) + 3y(L-2h) - y(L-3h)) / h^3 = 0
+    #EI * (5y(L) - 18y(L-h) + 24y(L-2h) - 14y(L-3h) + 3y(L-4h)) / (2h^3) = 0
     K[n_nodes-2, n_nodes-1] = 5 * E * I_D / (2 * dz**3)
     K[n_nodes-2, n_nodes-2] = -18 * E * I_D / (2 * dz**3)
     K[n_nodes-2, n_nodes-3] = 24 * E * I_D / (2 * dz**3)
@@ -193,9 +193,9 @@ def launch_optimization():
     best_l = DL0[1]
     for i in range((20-4)*100 + 1):
         d = starting_d + i/100
-        l_max = length(best_volume, d) * 1.1
+        l_max = length(best_volume, d) * 1.1  # Inutile de chercher si vol > best_volume
         l = optimal_l(d, l_max)
-        if (l is None): continue
+        if (l is None): continue  # l_optimal plus grand que l_max
         vol = volume((d, l))
         if vol < best_volume:
             best_volume = vol
@@ -244,7 +244,7 @@ def plot_displacement(ys, z):
     plt.title('Deplacement du pieu')
     plt.show()
 
-### TODO plotter la contrainte sigma(z) en fonction de z
+### plotter la contrainte sigma(z) en fonction de z
 def plot_stresses(sigmas, z):
     plt.plot(sigmas/1e6, -z)
     plt.xlabel('Contrainte [MPa]')
@@ -252,7 +252,7 @@ def plot_stresses(sigmas, z):
     plt.title('Contrainte du pieu')
     plt.show()
 
-### TODO plotter le moment en fonction de z
+### plotter le moment en fonction de z
 def plot_moments(Ms, z):
     plt.plot(Ms/1e6, -z)
     plt.xlabel('Moment [MNm]')
@@ -260,7 +260,7 @@ def plot_moments(Ms, z):
     plt.title('Moment flechissant du pieu')
     plt.show()
 
-### TODO plotter l'effort tranchant en fonction de z
+### plotter l'effort tranchant en fonction de z
 def plot_shear_forces(Vs, z):
     plt.plot(Vs/1e6, -z)
     plt.xlabel('Effort tranchant [MN]')
@@ -268,6 +268,7 @@ def plot_shear_forces(Vs, z):
     plt.title('Effort tranchant du pieu')
     plt.show()
 
+### plotter la courbe p-y pour z et D donnes
 def plot_ky(z, D):
     plt.plot(np.linspace(0, 1, 100), [k_y(y, z, D) for y in np.linspace(0, 1, 100)])
     plt.xlabel('y')
@@ -290,7 +291,7 @@ y_tete = y[0]
 z = np.linspace(0, DL0[1], n_nodes)
 Ms, Vs, sigmas = M_V_sigma(y, z, DL0[0])
 sigma_max = max(sigmas)
-z_sigma_max = z[np.argmax(sigmas)]
+z_sigma_max = z[np.argmax(sigmas)]  # Profondeur de la contrainte maximale
 print(f"Volume(D={DL0[0]}m, L={DL0[1]}m) = {volume(DL0):.2f} m^3")
 print(f"sigma_max(D={DL0[0]}m, z={z_sigma_max:.4f}m) = {sigma_max:.2f} N/m^2")
 print(f"deplacement en tete = {y_tete:.6f} m")
@@ -307,7 +308,7 @@ y_tete_opt = y[0]
 z_opt = np.linspace(0, L_opt, n_nodes)
 Ms_opt, Vs_opt, sigmas_opt = M_V_sigma(y_opt, z_opt, D_opt)
 sigma_max_opt = max(sigmas_opt)
-z_sigma_max_opt = z_opt[np.argmax(sigmas_opt)]
+z_sigma_max_opt = z_opt[np.argmax(sigmas_opt)]  # Profondeur de la contrainte maximale
 
 print("-"*80 + "\nOptimization result:")
 print(f"D = {D_opt:.4f} m \tL = {L_opt:.4f} m")
