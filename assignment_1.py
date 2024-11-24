@@ -268,9 +268,23 @@ def plot_shear_forces(Vs, z):
     plt.title('Effort tranchant du pieu')
     plt.show()
 
+def plot_ky(z, D):
+    plt.plot(np.linspace(0, 1, 100), [k_y(y, z, D) for y in np.linspace(0, 1, 100)])
+    plt.xlabel('y')
+    plt.ylabel('k_y [N/m^3]')
+    plt.title(f'Courbe p-y pour z={z}m et D={D}m')
+    plt.show()
+    plt.plot(np.linspace(0, 1, 100), [D*y*k_y(y, z, D) for y in np.linspace(0, 1, 100)])
+    plt.xlabel('y')
+    plt.ylabel('p [N/m]')
+    plt.title(f'Courbe p-y pour z={z}m et D={D}m')
+    plt.show()
+
 """
 Demarrage du programme
 """
+plot_ky(10, 5.76)
+
 y = solve(DL0)
 y_tete = y[0]
 z = np.linspace(0, DL0[1], n_nodes)
