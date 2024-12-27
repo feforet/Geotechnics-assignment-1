@@ -54,8 +54,8 @@ E = 210e9  # Module de Young de l'acier
 t = lambda D: min (0.00635 + D/100, 0.09)  # Epaisseur de la paroi du pieu
 I = lambda D: m.pi * (D**4 - (D - 2 * t(D))**4) / 64  # Moment d'inertie du pieu
 section = lambda D: m.pi * (D**2 - (D - 2 * t(D))**2) / 4  # Section d'acier du pieu
-volume = lambda DL: DL[1] * m.pi * section(DL[0])  # Volume d'acier du pieu
-length = lambda volume, D: volume / (m.pi * section(D))
+volume = lambda DL: (DL[1] + h_w) * section(DL[0])  # Volume d'acier du pieu
+length = lambda volume, D: volume / section(D) - h_w
 f_y = 355e6  # Limite d'elasticite de l'acier
 
 ### Parametres de calcul
