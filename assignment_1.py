@@ -7,6 +7,7 @@ import math as m
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
+import time
 
 """
 Donnees
@@ -59,7 +60,7 @@ length = lambda volume, D: volume / section(D) - h_w
 f_y = 355e6  # Limite d'elasticite de l'acier
 
 ### Parametres de calcul
-n_nodes = 200  # Nombre de noeuds
+n_nodes_opti = 200  # Nombre de noeuds
 tolerance = 1e-5  # Tolerance de convergence
 max_iter = 1e4  # Nombre maximal d'iterations
 
@@ -112,7 +113,7 @@ def k_y(y, z, D):
 """
 Methode des differences finies
 """
-def solve(DL):
+def solve(DL, n_nodes=n_nodes_opti):
     D, L = DL
     if (D <= 0 or L <= 0): return np.full(n_nodes, np.inf)  # Valeurs invalides
     dz = L / (n_nodes - 1)  # Pas de discretisation
@@ -210,7 +211,7 @@ def optimal_l(d, l_max):
     incr = 1
     while incr > 1e-5:
         y = solve((d, l))
-        ms, vs, sigmas = M_V_sigma(y, np.linspace(0, l, n_nodes), d)
+        ms, vs, sigmas = M_V_sigma(y, np.linspace(0, l, n_nodes_opti), d)
         if (y[0] > 0.1*d) or (max(sigmas) > f_y):
             l += incr
             incr /= 10
@@ -237,11 +238,17 @@ def M_V_sigma(y, z, D):
     return Ms, Vs, sigmas
 
 ### plotter le deplacement y(z) en fonction de z
-def plot_displacement(ys, z):
-    plt.plot(ys*1e2, -z)
-    plt.xlabel('Deplacement lateral [cm]')
+def plot_displacement(ys, zs):
+    if (np.copy(ys[0]).ndim == 0): 
+        ys = [ys]
+        zs = [zs]
+    for i, y in enumerate(ys):
+        plt.plot(y*1e2, -zs[i], label = f'{len(y)} noeuds')
+    plt.xlabel('Déplacement latéral [cm]')
     plt.ylabel('Profondeur (-z) [m]')
-    plt.title('Deplacement du pieu')
+    plt.title('Déplacement du pieu')
+    plt.legend()
+    plt.savefig('plots/displacement_'+str(time.strftime("%Y_%m_%d_%H_%M_%S"))+'.png')
     plt.show()
 
 ### plotter la contrainte sigma(z) en fonction de z
@@ -284,11 +291,36 @@ def plot_ky(z, D):
 """
 Demarrage du programme
 """
+# p-y curve
 plot_ky(10, 5.76)
 
+# n_nodes optimization
+n_nodes = [6, 10, 25, 50, 100, 200, 1000]
+ys = []
+zs = []
+times = []
+for i, nnodes in enumerate(n_nodes):
+    start = time.perf_counter_ns()
+    y = solve(DL0, nnodes)
+    end = time.perf_counter_ns()
+    z = np.linspace(0, DL0[1], nnodes)
+    ys.append(y)
+    zs.append(z)
+    times.append(end - start)
+
+print("\n" + "-"*80 + "\n")
+print(f"y({n_nodes[-1]}): {ys[-1][0]}")
+print(f"y({n_nodes[-2]}): {ys[-2][0]}")
+print(f"temps de calcul pour {n_nodes[-1]} noeuds: {times[-1]/1e9} s")
+print(f"temps de calcul pour {n_nodes[-2]} noeuds: {times[-2]/1e9} s")
+print("\n" + "-"*80 + "\n")
+
+plot_displacement(ys, zs)
+
+# Optimal dimensions
 y = solve(DL0)
 y_tete = y[0]
-z = np.linspace(0, DL0[1], n_nodes)
+z = np.linspace(0, DL0[1], n_nodes_opti)
 Ms, Vs, sigmas = M_V_sigma(y, z, DL0[0])
 sigma_max = max(sigmas)
 z_sigma_max = z[np.argmax(sigmas)]  # Profondeur de la contrainte maximale
@@ -300,23 +332,23 @@ plot_moments(Ms, z)
 plot_shear_forces(Vs, z)
 plot_stresses(sigmas, z)
 
-
+# Dimensions optimization
 DL_opt = launch_optimization()
 D_opt, L_opt = DL_opt
 y_opt = solve((D_opt, L_opt))
 y_tete_opt = y[0]
-z_opt = np.linspace(0, L_opt, n_nodes)
+z_opt = np.linspace(0, L_opt, n_nodes_opti)
 Ms_opt, Vs_opt, sigmas_opt = M_V_sigma(y_opt, z_opt, D_opt)
 sigma_max_opt = max(sigmas_opt)
 z_sigma_max_opt = z_opt[np.argmax(sigmas_opt)]  # Profondeur de la contrainte maximale
 
-print("-"*80 + "\nOptimization result:")
+print("\n" + "-"*80 + "\nOptimization result:")
 print(f"D = {D_opt:.4f} m \tL = {L_opt:.4f} m")
 print(f"Volume(D={D_opt:.4f}m, L={L_opt:.4f}m) = {volume((D_opt, L_opt)):.4f} m^3")
 print(f"sigma_max(D={D_opt:.4f}m, z={z_sigma_max_opt:.4f}m) = {sigma_max_opt:.4f} N/m^2")
 print(f"Deplacement en tete = {y_tete_opt:.6f} m")
 print(f"y[0] = {y_tete_opt/D_opt:.6f} * D")
-plot_displacement(y, np.linspace(0, L_opt, n_nodes))
+plot_displacement(y, np.linspace(0, L_opt, n_nodes_opti))
 plot_moments(Ms_opt, z_opt)
 plot_shear_forces(Vs_opt, z_opt)
 plot_stresses(sigmas_opt, z_opt)
